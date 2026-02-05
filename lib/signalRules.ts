@@ -16,7 +16,7 @@ const FUNDING_PATTERNS = [
   /\bcapital\b/i,
   /\bstrategic investment\b/i,
   /\bprivate equity\b/i,
-  /\b$?\d+(?:\.\d+)?\s?(?:million|billion|m|bn)\b/i
+  /\b\$?\d+(?:\.\d+)?\s?(?:million|billion|m|bn)\b/i
 ];
 
 const GEO_PATTERNS = [
