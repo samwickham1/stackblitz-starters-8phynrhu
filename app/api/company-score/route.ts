@@ -109,8 +109,12 @@ export async function GET(request: Request) {
     const wikiSignal = scoreFromWikidata(wikidata.sponsorOf);
 
     const titles = [
-      ...gdelt.articles.map((article) => article.title).filter(Boolean),
-      ...newsdata.articles.map((article) => article.title).filter(Boolean)
+      ...gdelt.articles
+        .map((article: { title?: string }) => article.title)
+        .filter(Boolean),
+      ...newsdata.articles
+        .map((article: { title?: string }) => article.title)
+        .filter(Boolean)
     ] as string[];
     const signalMatches = detectSignalsFromTitles(titles);
     const signalScore = Math.min(
