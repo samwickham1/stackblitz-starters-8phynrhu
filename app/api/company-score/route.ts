@@ -97,11 +97,11 @@ export async function GET(request: Request) {
       fetchWikidata(name)
     ]);
 
-    let newsdata = { articles: [] as { pubDate?: string }[] };
+    let newsdata = { articles: [] as { pubDate?: string; title?: string }[] };
     try {
       newsdata = await fetchNewsdataQuery(name, 10);
     } catch {
-      newsdata = { articles: [] as { pubDate?: string }[] };
+      newsdata = { articles: [] as { pubDate?: string; title?: string }[] };
     }
 
     const gdeltSignal = scoreFromGdelt(gdelt.articles);
