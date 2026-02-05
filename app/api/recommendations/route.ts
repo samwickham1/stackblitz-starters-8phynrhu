@@ -153,7 +153,7 @@ export async function GET(request: Request) {
   const gdelt = await fetchGdeltQuery(query, 50);
   let newsdata = { articles: [] as { title?: string }[] };
   try {
-    newsdata = await fetchNewsdataQuery(query, 50);
+    newsdata = await fetchNewsdataQuery(query, 10);
   } catch {
     newsdata = { articles: [] as { title?: string }[] };
   }

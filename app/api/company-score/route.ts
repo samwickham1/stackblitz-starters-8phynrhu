@@ -98,7 +98,7 @@ export async function GET(request: Request) {
 
     let newsdata = { articles: [] as { pubDate?: string }[] };
     try {
-      newsdata = await fetchNewsdataQuery(name, 25);
+      newsdata = await fetchNewsdataQuery(name, 10);
     } catch {
       newsdata = { articles: [] as { pubDate?: string }[] };
     }

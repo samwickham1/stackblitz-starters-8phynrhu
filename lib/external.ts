@@ -85,7 +85,7 @@ export async function fetchGdelt(companyName: string) {
   return fetchGdeltQuery(companyName, 25);
 }
 
-export async function fetchNewsdataQuery(query: string, maxRecords = 25) {
+export async function fetchNewsdataQuery(query: string, maxRecords = 10) {
   const apiKey = process.env.NEWSDATA_API_KEY;
   if (!apiKey) {
     throw new Error("Missing NEWSDATA_API_KEY");
@@ -95,9 +95,10 @@ export async function fetchNewsdataQuery(query: string, maxRecords = 25) {
   const cached = getCached<{ articles: NewsdataArticle[] }>(cacheKey);
   if (cached) return cached;
 
+  const size = Math.max(1, Math.min(10, maxRecords));
   const url = `https://newsdata.io/api/1/latest?apikey=${apiKey}&q=${encodeURIComponent(
     query
-  )}&language=en`;
+  )}&language=en&size=${size}`;
 
   const response = await fetch(url, {
     headers: { "User-Agent": "signal-scout/0.1" },
@@ -118,7 +119,7 @@ export async function fetchNewsdataQuery(query: string, maxRecords = 25) {
       sourceId: item.source_id ?? item.source
     }))
     .filter((item: NewsdataArticle) => item.url)
-    .slice(0, maxRecords);
+    .slice(0, size);
 
   const payload = { articles };
   setCached(cacheKey, payload);
