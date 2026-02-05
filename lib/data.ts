@@ -22,6 +22,26 @@ export const companies: Company[] = [
       "Premium EV manufacturer expanding into APAC with heavy brand investment and motorsport-friendly positioning.",
     score: 84,
     rightsFit: ["F1", "EPL", "NBA"],
+    rationale: [
+      "Series D funding indicates budget capacity for premium partnerships.",
+      "APAC expansion aligns with global rights holders and live events.",
+      "New CMO with sponsorship track record suggests near-term activation."
+    ],
+    marketingObjectives: [
+      "Increase global brand awareness",
+      "Build premium performance positioning",
+      "Associate with innovation-led audiences"
+    ],
+    businessObjectives: [
+      "Accelerate APAC market entry",
+      "Drive direct-to-consumer adoption",
+      "Support dealership growth"
+    ],
+    rightsholderRationale: [
+      { holder: "F1", reason: "Global reach and premium tech alignment." },
+      { holder: "EPL", reason: "Mass-market visibility in new regions." },
+      { holder: "NBA", reason: "US growth plus global fan base." }
+    ],
     signals: [
       {
         id: "am-s1",
@@ -84,6 +104,25 @@ export const companies: Company[] = [
       "Fast-growing payments platform targeting consumer adoption via lifestyle partnerships.",
     score: 78,
     rightsFit: ["EPL", "NBA"],
+    rationale: [
+      "Large Series C round supports brand investment.",
+      "New CMO with EPL sponsorship experience.",
+      "US market entry signals consumer brand push."
+    ],
+    marketingObjectives: [
+      "Drive consumer adoption",
+      "Increase payment brand trust",
+      "Expand lifestyle relevance"
+    ],
+    businessObjectives: [
+      "Grow US transaction volume",
+      "Increase card usage frequency",
+      "Expand merchant partnerships"
+    ],
+    rightsholderRationale: [
+      { holder: "EPL", reason: "High visibility for European consumers." },
+      { holder: "NBA", reason: "Strong US growth and global fans." }
+    ],
     signals: [
       {
         id: "pp-s1",
@@ -126,6 +165,26 @@ export const companies: Company[] = [
       "Performance drink brand targeting endurance audiences and global sports visibility.",
     score: 88,
     rightsFit: ["F1", "EPL", "ATP/WTA"],
+    rationale: [
+      "Brand campaign centered on athlete-led performance.",
+      "International expansion into LATAM and Middle East.",
+      "Activation history in endurance events."
+    ],
+    marketingObjectives: [
+      "Associate with elite performance",
+      "Grow global distribution",
+      "Increase athlete-led credibility"
+    ],
+    businessObjectives: [
+      "Scale international sales channels",
+      "Increase repeat purchases",
+      "Drive retail partner expansion"
+    ],
+    rightsholderRationale: [
+      { holder: "F1", reason: "High-performance brand alignment." },
+      { holder: "EPL", reason: "Massive global fan base reach." },
+      { holder: "ATP/WTA", reason: "Endurance and wellness audience fit." }
+    ],
     signals: [
       {
         id: "nh-s1",

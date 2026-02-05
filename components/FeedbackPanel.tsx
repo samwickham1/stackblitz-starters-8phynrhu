@@ -38,24 +38,31 @@ function saveFeedback(companyId: string, feedback: Feedback) {
 function download(name: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
   URL.revokeObjectURL(url);
 }
 
 function toCsv(data: Record<string, Feedback>) {
-  const headers = ["companyId", "accuracy", "intent", "targetRightsHolder", "notes", "updatedAt"];
-  const rows = Object.entries(data).map(([companyId, f]) => [
+  const headers = [
+    "companyId",
+    "accuracy",
+    "intent",
+    "targetRightsHolder",
+    "notes",
+    "updatedAt"
+  ];
+  const rows = Object.entries(data).map(([companyId, feedback]) => [
     companyId,
-    f.accuracy,
-    f.intent,
-    f.targetRightsHolder,
-    `"${f.notes.replace(/"/g, '""')}"`,
-    f.updatedAt
+    feedback.accuracy,
+    feedback.intent,
+    feedback.targetRightsHolder,
+    `"${feedback.notes.replace(/"/g, '""')}"`,
+    feedback.updatedAt
   ]);
-  return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
 
 export default function FeedbackPanel({
@@ -146,9 +153,7 @@ export default function FeedbackPanel({
                 name="accuracy"
                 value={value}
                 checked={accuracy === value}
-                onChange={() =>
-                  setAccuracy(value as Feedback["accuracy"])
-                }
+                onChange={() => setAccuracy(value as Feedback["accuracy"])}
               />
               {value}
             </label>
@@ -161,7 +166,9 @@ export default function FeedbackPanel({
           </div>
           <select
             value={intent}
-            onChange={(e) => setIntent(e.target.value as Feedback["intent"])}
+            onChange={(event) =>
+              setIntent(event.target.value as Feedback["intent"])
+            }
             className="w-full rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-sm"
           >
             <option>Contact</option>
@@ -176,11 +183,11 @@ export default function FeedbackPanel({
           </div>
           <select
             value={targetRightsHolder}
-            onChange={(e) => setTargetRightsHolder(e.target.value)}
+            onChange={(event) => setTargetRightsHolder(event.target.value)}
             className="w-full rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-sm"
           >
-            {rightsOptions.map((r) => (
-              <option key={r}>{r}</option>
+            {rightsOptions.map((right) => (
+              <option key={right}>{right}</option>
             ))}
           </select>
         </div>
@@ -192,7 +199,7 @@ export default function FeedbackPanel({
         </div>
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(event) => setNotes(event.target.value)}
           rows={3}
           className="mt-2 w-full rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-sm"
           placeholder="Why this score feels off or right, signals you’ve seen, deal context..."
