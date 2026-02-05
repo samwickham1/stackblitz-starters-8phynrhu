@@ -1,11 +1,113 @@
-import { companies } from "@/lib/data";
-import { fetchGdelt, fetchWikidata } from "@/lib/external";
+import { fetchGdeltQuery, fetchWikidata } from "@/lib/external";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_QUERY =
+  '(sponsorship OR sponsor OR "naming rights" OR "official partner" OR "partnership" OR "brand partner" OR "jersey sponsor" OR "shirt sponsor")';
+
+const STOPWORDS = new Set([
+  "The",
+  "A",
+  "An",
+  "And",
+  "Or",
+  "For",
+  "With",
+  "In",
+  "On",
+  "At",
+  "To",
+  "From",
+  "By",
+  "Of",
+  "New",
+  "Launches",
+  "Announces",
+  "Partners",
+  "Partnership",
+  "Sponsorship",
+  "Sponsor",
+  "Official",
+  "League",
+  "Club",
+  "Team",
+  "Cup",
+  "Open",
+  "Grand",
+  "Prix",
+  "Championship",
+  "Tournament",
+  "Series"
+]);
+
+const SPORTS_TERMS = new Set([
+  "NFL",
+  "NBA",
+  "MLB",
+  "NHL",
+  "EPL",
+  "ATP",
+  "WTA",
+  "F1",
+  "UFC",
+  "FIFA",
+  "UEFA",
+  "Formula",
+  "Premier",
+  "League",
+  "Grand",
+  "Prix"
+]);
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizeCandidate(value: string) {
+  return value.replace(/^[“"']|[”"']$/g, "").replace(/\s+/g, " ").trim();
+}
+
+function isValidCandidate(value: string) {
+  const cleaned = normalizeCandidate(value);
+  if (!cleaned) return false;
+  if (cleaned.length < 3) return false;
+  if (STOPWORDS.has(cleaned)) return false;
+  if (SPORTS_TERMS.has(cleaned)) return false;
+  const words = cleaned.split(" ");
+  if (words.length > 4) return false;
+  if (words.length === 1) {
+    if (cleaned.length < 4) return false;
+    if (/^[A-Z]{2,4}$/.test(cleaned)) return false;
+  }
+  if (words.some((word) => STOPWORDS.has(word))) return false;
+  return true;
+}
+
+function extractCandidates(articles: { title?: string }[]) {
+  const map = new Map<string, { mentions: number; evidence: string[] }>();
+
+  for (const article of articles) {
+    const title = article.title ?? "";
+    const matches =
+      title.match(/[A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,3}/g) ??
+      [];
+
+    for (const raw of matches) {
+      const candidate = normalizeCandidate(raw);
+      if (!isValidCandidate(candidate)) continue;
+      const entry = map.get(candidate) ?? { mentions: 0, evidence: [] };
+      entry.mentions += 1;
+      if (entry.evidence.length < 3 && title) {
+        entry.evidence.push(title);
+      }
+      map.set(candidate, entry);
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([name, data]) => ({ name, ...data }))
+    .sort((a, b) => b.mentions - a.mentions);
 }
 
 function parseSeenDate(value?: string) {
@@ -35,28 +137,30 @@ function scoreFromWikidata(sponsorOf: unknown[]) {
   return Math.min(15, sponsorOf.length * 3);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("query") ?? DEFAULT_QUERY;
+
+  const gdelt = await fetchGdeltQuery(query, 50);
+  const candidates = extractCandidates(gdelt.articles).slice(0, 12);
+
   const results = [];
 
-  for (const company of companies) {
-    const [gdelt, wikidata] = await Promise.all([
-      fetchGdelt(company.name),
-      fetchWikidata(company.name)
-    ]);
-
-    const externalScore =
-      scoreFromGdelt(gdelt.articles) + scoreFromWikidata(wikidata.sponsorOf);
-    const totalScore = clampScore(company.score + externalScore);
+  for (const candidate of candidates) {
+    const wikidata = await fetchWikidata(candidate.name);
+    const sponsorLinks = wikidata.sponsorOf.length;
+    const mediaScore = Math.min(25, candidate.mentions * 4);
+    const sponsorScore = Math.min(20, sponsorLinks * 4);
+    const entityScore = wikidata.entity ? 5 : 0;
+    const totalScore = clampScore(40 + mediaScore + sponsorScore + entityScore);
 
     results.push({
-      id: company.id,
-      name: company.name,
-      industry: company.industry,
-      region: company.region,
-      baseScore: company.score,
-      externalScore,
+      name: candidate.name,
       totalScore,
-      rightsFit: company.rightsFit
+      mediaMentions: candidate.mentions,
+      sponsorLinks,
+      evidence: candidate.evidence,
+      entity: wikidata.entity
     });
   }
 
@@ -64,6 +168,7 @@ export async function GET() {
 
   return Response.json({
     updatedAt: new Date().toISOString(),
+    query,
     results
   });
 }

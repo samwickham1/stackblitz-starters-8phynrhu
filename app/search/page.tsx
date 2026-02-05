@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import CompanyCard from "@/components/CompanyCard";
 import { companies, rightsHolders } from "@/lib/data";
 import { scoreTier } from "@/lib/score";
@@ -12,12 +13,48 @@ const marketingObjectives = Array.from(
 );
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(initialQuery);
   const [industry, setIndustry] = useState("All");
   const [region, setRegion] = useState("All");
   const [rights, setRights] = useState("All");
   const [tier, setTier] = useState("All");
   const [objective, setObjective] = useState("All");
+  const [liveScore, setLiveScore] = useState<{
+    name: string;
+    baseScore: number;
+    externalScore: number;
+    totalScore: number;
+    externalSignals: { type: string; impact: number; detail: string }[];
+  } | null>(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
+  const fetchLiveScore = async () => {
+    if (!query.trim()) return;
+    try {
+      setLiveLoading(true);
+      setLiveError(null);
+      const response = await fetch(
+        `/api/company-score?name=${encodeURIComponent(query.trim())}`
+      );
+      if (!response.ok) {
+        throw new Error("Live score request failed");
+      }
+      const data = await response.json();
+      setLiveScore(data);
+    } catch (err) {
+      setLiveError(err instanceof Error ? err.message : "Failed to load score");
+      setLiveScore(null);
+    } finally {
+      setLiveLoading(false);
+    }
+  };
 
   const results = useMemo(() => {
     const q = query.toLowerCase();
@@ -124,6 +161,50 @@ export default function SearchPage() {
             ))}
           </select>
         </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            onClick={fetchLiveScore}
+            className="rounded-full bg-ink px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist"
+          >
+            {liveLoading ? "Scoring..." : "Get live score"}
+          </button>
+          {liveError && <span className="text-xs text-rose-600">{liveError}</span>}
+        </div>
+
+        {liveScore && (
+          <div className="mt-4 card p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate">
+              Live score for {liveScore.name}
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <div className="text-xs text-slate">Base</div>
+                <div className="text-2xl font-semibold">{liveScore.baseScore}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate">API impact</div>
+                <div className="text-2xl font-semibold">
+                  +{liveScore.externalScore}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate">Total</div>
+                <div className="text-2xl font-semibold">
+                  {liveScore.totalScore}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-1 text-sm text-slate">
+              {liveScore.externalSignals.map((signal) => (
+                <div key={signal.type}>
+                  • {signal.type}: {signal.detail} (+
+                  {signal.impact})
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">

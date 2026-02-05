@@ -42,14 +42,14 @@ function setCached<T>(key: string, value: T, ttlMs = DEFAULT_TTL_MS) {
   cache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
 
-export async function fetchGdelt(companyName: string) {
-  const cacheKey = `gdelt:${companyName.toLowerCase()}`;
+export async function fetchGdeltQuery(query: string, maxRecords = 25) {
+  const cacheKey = `gdelt:${query.toLowerCase()}:${maxRecords}`;
   const cached = getCached<{ articles: GdeltArticle[] }>(cacheKey);
   if (cached) return cached;
 
   const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(
-    companyName
-  )}&mode=ArtList&maxrecords=25&format=json`;
+    query
+  )}&mode=ArtList&maxrecords=${maxRecords}&format=json`;
 
   const response = await fetch(url, {
     headers: { "User-Agent": "signal-scout/0.1" },
@@ -72,6 +72,10 @@ export async function fetchGdelt(companyName: string) {
   const payload = { articles };
   setCached(cacheKey, payload);
   return payload;
+}
+
+export async function fetchGdelt(companyName: string) {
+  return fetchGdeltQuery(companyName, 25);
 }
 
 export async function fetchWikidata(companyName: string) {

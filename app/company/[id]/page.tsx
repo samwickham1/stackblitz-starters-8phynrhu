@@ -5,7 +5,6 @@ import Link from "next/link";
 import ScorePill from "@/components/ScorePill";
 import SignalTimeline from "@/components/SignalTimeline";
 import SponsorshipList from "@/components/SponsorshipList";
-import FeedbackPanel from "@/components/FeedbackPanel";
 import LiveSignals from "@/components/LiveSignals";
 import { companies } from "@/lib/data";
 import { topSignals } from "@/lib/score";
@@ -163,8 +162,6 @@ export default function CompanyPage() {
       </section>
 
       <LiveSignals companyName={company.name} />
-
-      <FeedbackPanel companyId={company.id} rightsOptions={company.rightsFit} />
 
       <section className="panel p-6">
         <div className="text-xs uppercase tracking-[0.2em] text-slate">

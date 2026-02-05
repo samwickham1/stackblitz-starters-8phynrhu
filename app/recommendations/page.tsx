@@ -2,22 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { companies } from "@/lib/data";
 
 type Recommendation = {
-  id: string;
   name: string;
-  industry: string;
-  region: string;
-  baseScore: number;
-  externalScore: number;
   totalScore: number;
-  rightsFit: string[];
+  mediaMentions: number;
+  sponsorLinks: number;
+  evidence: string[];
+  entity?: {
+    id: string;
+    label: string;
+    description?: string;
+    url: string;
+  } | null;
 };
 
 export default function RecommendationsPage() {
   const [items, setItems] = useState<Recommendation[]>([]);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [query, setQuery] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +35,7 @@ export default function RecommendationsPage() {
         const data = await response.json();
         setItems(data.results ?? []);
         setUpdatedAt(data.updatedAt ?? null);
+        setQuery(data.query ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");
         setItems([]);
@@ -43,21 +47,6 @@ export default function RecommendationsPage() {
     load();
   }, []);
 
-  const fallback = [...companies]
-    .sort((a, b) => b.score - a.score)
-    .map((company) => ({
-      id: company.id,
-      name: company.name,
-      industry: company.industry,
-      region: company.region,
-      baseScore: company.score,
-      externalScore: 0,
-      totalScore: company.score,
-      rightsFit: company.rightsFit
-    }));
-
-  const list = items.length > 0 ? items : fallback;
-
   return (
     <div className="space-y-6">
       <section className="panel p-6">
@@ -65,11 +54,16 @@ export default function RecommendationsPage() {
           Recommendations
         </div>
         <h1 className="mt-2 text-3xl font-semibold">
-          Best companies to contact this week.
+          Real companies surfaced from live signals
         </h1>
         <p className="mt-2 text-sm text-slate">
-          Ranked using live API signals (GDELT + Wikidata).
+          Ranked using GDELT news volume and Wikidata sponsorship links.
         </p>
+        {query && (
+          <div className="mt-2 text-xs text-slate">
+            Query: {query}
+          </div>
+        )}
         {updatedAt && (
           <div className="mt-2 text-xs text-slate">
             Updated {new Date(updatedAt).toLocaleString()}
@@ -88,44 +82,57 @@ export default function RecommendationsPage() {
             Loading live recommendations...
           </div>
         )}
+        {!loading && items.length === 0 && (
+          <div className="card p-4 text-sm text-slate">
+            No companies discovered yet. Try again later.
+          </div>
+        )}
         {!loading &&
-          list.map((company) => (
-            <div key={company.id} className="card p-5">
+          items.map((company) => (
+            <div key={company.name} className="card p-5 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold">{company.name}</div>
-                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-slate">
-                    {company.industry} • {company.region}
-                  </div>
+                  {company.entity?.description && (
+                    <div className="mt-1 text-xs text-slate">
+                      {company.entity.description}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-slate">
-                    Base: <span className="font-semibold">{company.baseScore}</span>
-                  </div>
-                  <div className="text-sm text-slate">
-                    API: <span className="font-semibold">+{company.externalScore}</span>
-                  </div>
-                  <div className="text-lg font-semibold">
-                    {company.totalScore}
-                  </div>
+                <div className="text-2xl font-semibold">
+                  {company.totalScore}
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {company.rightsFit.map((right) => (
-                  <span
-                    key={right}
-                    className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-ink"
+
+              <div className="flex flex-wrap gap-4 text-xs text-slate">
+                <div>Media mentions: {company.mediaMentions}</div>
+                <div>Wikidata sponsorships: {company.sponsorLinks}</div>
+                {company.entity?.url && (
+                  <a
+                    href={company.entity.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
                   >
-                    {right}
-                  </span>
+                    Wikidata
+                  </a>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {company.evidence.map((title, index) => (
+                  <div key={`${company.name}-evidence-${index}`} className="text-sm">
+                    • {title}
+                  </div>
                 ))}
               </div>
-              <div className="mt-4">
+
+              <div className="pt-2">
                 <Link
-                  href={`/company/${company.id}`}
+                  href={`/search?q=${encodeURIComponent(company.name)}`}
                   className="text-xs uppercase tracking-[0.2em] text-ink underline"
                 >
-                  View company
+                  Score this company
                 </Link>
               </div>
             </div>
