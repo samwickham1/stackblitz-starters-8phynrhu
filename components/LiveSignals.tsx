@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type GdeltArticle = {
   title: string;
@@ -32,6 +32,7 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
   const [gdelt, setGdelt] = useState<GdeltArticle[]>([]);
   const [wikidata, setWikidata] = useState<WikidataResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetched, setLastFetched] = useState<string | null>(null);
 
   const fetchSignals = async () => {
     setLoading(true);
@@ -55,12 +56,19 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
 
       setGdelt(gdeltData.articles ?? []);
       setWikidata(wikiData);
+      setLastFetched(new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch signals");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!companyName) return;
+    fetchSignals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyName]);
 
   return (
     <div className="panel p-6">
@@ -75,6 +83,11 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
           <p className="mt-1 text-sm text-slate">
             Pulls recent news and known sponsorship links to validate scoring.
           </p>
+          {lastFetched && (
+            <div className="mt-2 text-xs text-slate">
+              Last fetched: {new Date(lastFetched).toLocaleString()}
+            </div>
+          )}
         </div>
         <button
           onClick={fetchSignals}
