@@ -27,10 +27,21 @@ type WikidataResponse = {
   sponsorOf: WikidataSponsorship[];
 };
 
+type CompanyScoreResponse = {
+  name: string;
+  baseScore: number;
+  externalScore: number;
+  totalScore: number;
+  externalSignals: { type: string; impact: number; detail: string }[];
+  gdelt: GdeltArticle[];
+  wikidata: WikidataResponse;
+};
+
 export default function LiveSignals({ companyName }: { companyName: string }) {
   const [loading, setLoading] = useState(false);
   const [gdelt, setGdelt] = useState<GdeltArticle[]>([]);
   const [wikidata, setWikidata] = useState<WikidataResponse | null>(null);
+  const [score, setScore] = useState<CompanyScoreResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
 
@@ -39,23 +50,18 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
     setError(null);
 
     try {
-      const [gdeltRes, wikiRes] = await Promise.all([
-        fetch(`/api/gdelt?query=${encodeURIComponent(companyName)}`),
-        fetch(`/api/wikidata?query=${encodeURIComponent(companyName)}`)
-      ]);
+      const response = await fetch(
+        `/api/company-score?name=${encodeURIComponent(companyName)}`
+      );
 
-      if (!gdeltRes.ok) {
-        throw new Error("GDELT request failed");
-      }
-      if (!wikiRes.ok) {
-        throw new Error("Wikidata request failed");
+      if (!response.ok) {
+        throw new Error("Score request failed");
       }
 
-      const gdeltData = (await gdeltRes.json()) as { articles: GdeltArticle[] };
-      const wikiData = (await wikiRes.json()) as WikidataResponse;
-
-      setGdelt(gdeltData.articles ?? []);
-      setWikidata(wikiData);
+      const data = (await response.json()) as CompanyScoreResponse;
+      setScore(data);
+      setGdelt(data.gdelt ?? []);
+      setWikidata(data.wikidata ?? null);
       setLastFetched(new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch signals");
@@ -100,6 +106,47 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
       {error && (
         <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
           {error}
+        </div>
+      )}
+
+      {score && (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="card p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate">
+              Base score
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{score.baseScore}</div>
+          </div>
+          <div className="card p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate">
+              API impact
+            </div>
+            <div className="mt-2 text-2xl font-semibold">
+              +{score.externalScore}
+            </div>
+          </div>
+          <div className="card p-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate">
+              Live score
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{score.totalScore}</div>
+          </div>
+        </div>
+      )}
+
+      {score && (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {score.externalSignals.map((signal) => (
+            <div key={signal.type} className="card p-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate">
+                {signal.type}
+              </div>
+              <div className="mt-2 text-sm">{signal.detail}</div>
+              <div className="mt-2 text-xs text-slate">
+                Impact: +{signal.impact}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

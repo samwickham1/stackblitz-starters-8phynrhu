@@ -1,105 +1,135 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import ScorePill from "@/components/ScorePill";
-import SignalTimeline from "@/components/SignalTimeline";
-import SponsorshipList from "@/components/SponsorshipList";
 import { companies } from "@/lib/data";
-import { topSignals } from "@/lib/score";
-import { usePipeline } from "@/lib/pipeline";
 
-export default function CompanyPage() {
-  const params = useParams();
-  const id = Array.isArray(params?.id) ? params?.id[0] : params?.id;
-  const company = companies.find((c) => c.id === id);
-  const { addToPipeline, setStage, getItem } = usePipeline();
+type Recommendation = {
+  id: string;
+  name: string;
+  industry: string;
+  region: string;
+  baseScore: number;
+  externalScore: number;
+  totalScore: number;
+  rightsFit: string[];
+};
 
-  if (!company) {
-    return (
-      <div className="panel p-6">
-        <h1 className="text-2xl font-semibold">Company not found</h1>
-        <Link href="/search" className="mt-4 inline-block text-sm underline">
-          Back to search
-        </Link>
-      </div>
-    );
-  }
+export default function RecommendationsPage() {
+  const [items, setItems] = useState<Recommendation[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const top = topSignals(company.signals);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/recommendations");
+        if (!response.ok) {
+          throw new Error("Failed to load recommendations");
+        }
+        const data = await response.json();
+        setItems(data.results ?? []);
+        setUpdatedAt(data.updatedAt ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const fallback = [...companies]
+    .sort((a, b) => b.score - a.score)
+    .map((company) => ({
+      id: company.id,
+      name: company.name,
+      industry: company.industry,
+      region: company.region,
+      baseScore: company.score,
+      externalScore: 0,
+      totalScore: company.score,
+      rightsFit: company.rightsFit
+    }));
+
+  const list = items.length > 0 ? items : fallback;
 
   return (
     <div className="space-y-6">
       <section className="panel p-6">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-slate">
-              {company.industry} • {company.region}
-            </div>
-            <h1 className="mt-2 text-3xl font-semibold">{company.name}</h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate">
-              {company.description}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {company.rightsFit.map((right) => (
-                <span
-                  key={right}
-                  className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-ink"
-                >
-                  {right}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-3">
-            <ScorePill score={company.score} />
-            <div className="text-xs uppercase tracking-[0.2em] text-slate">
-              Top drivers
-            </div>
-            <div className="text-sm">
-              {top.map((s) => s.type).join(" • ")}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            onClick={() => addToPipeline(company.id)}
-            className="rounded-full border border-ink/20 bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink hover:bg-ink hover:text-mist"
-          >
-            Add to pipeline
-          </button>
-          <button
-            onClick={() => setStage(company.id, "Contacted")}
-            className="rounded-full bg-ink px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist"
-          >
-            Mark contacted
-          </button>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div>
-          <div className="mb-3 text-xs uppercase tracking-[0.2em] text-slate">
-            Signal timeline
-          </div>
-          <SignalTimeline signals={company.signals} />
-        </div>
-        <div>
-          <div className="mb-3 text-xs uppercase tracking-[0.2em] text-slate">
-            Existing sponsorships
-          </div>
-          <SponsorshipList sponsorships={company.sponsorships} />
-        </div>
-      </section>
-
-      <section className="panel p-6">
         <div className="text-xs uppercase tracking-[0.2em] text-slate">
-          Pipeline status
+          Recommendations
         </div>
-        <div className="mt-2 text-lg font-semibold">
-          {getItem(company.id)?.stage ?? "Not in pipeline"}
-        </div>
+        <h1 className="mt-2 text-3xl font-semibold">
+          Best companies to contact this week.
+        </h1>
+        <p className="mt-2 text-sm text-slate">
+          Ranked using live API signals (GDELT + Wikidata).
+        </p>
+        {updatedAt && (
+          <div className="mt-2 text-xs text-slate">
+            Updated {new Date(updatedAt).toLocaleString()}
+          </div>
+        )}
+        {error && (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        {loading && (
+          <div className="card p-4 text-sm text-slate">
+            Loading live recommendations...
+          </div>
+        )}
+        {!loading &&
+          list.map((company) => (
+            <div key={company.id} className="card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">{company.name}</div>
+                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-slate">
+                    {company.industry} • {company.region}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-slate">
+                    Base: <span className="font-semibold">{company.baseScore}</span>
+                  </div>
+                  <div className="text-sm text-slate">
+                    API: <span className="font-semibold">+{company.externalScore}</span>
+                  </div>
+                  <div className="text-lg font-semibold">
+                    {company.totalScore}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {company.rightsFit.map((right) => (
+                  <span
+                    key={right}
+                    className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-ink"
+                  >
+                    {right}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4">
+                <Link
+                  href={`/company/${company.id}`}
+                  className="text-xs uppercase tracking-[0.2em] text-ink underline"
+                >
+                  View company
+                </Link>
+              </div>
+            </div>
+          ))}
       </section>
     </div>
   );
