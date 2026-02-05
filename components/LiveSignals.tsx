@@ -10,6 +10,13 @@ type GdeltArticle = {
   domain?: string;
 };
 
+type NewsdataArticle = {
+  title: string;
+  url: string;
+  pubDate?: string;
+  sourceId?: string;
+};
+
 type WikidataSponsorship = {
   id: string;
   label: string;
@@ -34,12 +41,14 @@ type CompanyScoreResponse = {
   totalScore: number;
   externalSignals: { type: string; impact: number; detail: string }[];
   gdelt: GdeltArticle[];
+  newsdata: NewsdataArticle[];
   wikidata: WikidataResponse;
 };
 
 export default function LiveSignals({ companyName }: { companyName: string }) {
   const [loading, setLoading] = useState(false);
   const [gdelt, setGdelt] = useState<GdeltArticle[]>([]);
+  const [newsdata, setNewsdata] = useState<NewsdataArticle[]>([]);
   const [wikidata, setWikidata] = useState<WikidataResponse | null>(null);
   const [score, setScore] = useState<CompanyScoreResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +70,7 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
       const data = (await response.json()) as CompanyScoreResponse;
       setScore(data);
       setGdelt(data.gdelt ?? []);
+      setNewsdata(data.newsdata ?? []);
       setWikidata(data.wikidata ?? null);
       setLastFetched(new Date().toISOString());
     } catch (err) {
@@ -150,7 +160,7 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
         <div>
           <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate">
             GDELT news
@@ -175,6 +185,35 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
                   {article.seenDate ?? "Unknown date"}
                   {article.domain ? ` • ${article.domain}` : ""}
                   {article.sourceCountry ? ` • ${article.sourceCountry}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate">
+            Newsdata coverage
+          </div>
+          <div className="space-y-3">
+            {newsdata.length === 0 && (
+              <div className="card p-4 text-sm text-slate">
+                No Newsdata coverage loaded yet.
+              </div>
+            )}
+            {newsdata.map((article, index) => (
+              <div key={`${article.url}-${index}`} className="card p-4">
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-semibold underline"
+                >
+                  {article.title || "Untitled article"}
+                </a>
+                <div className="mt-2 text-xs text-slate">
+                  {article.pubDate ?? "Unknown date"}
+                  {article.sourceId ? ` • ${article.sourceId}` : ""}
                 </div>
               </div>
             ))}

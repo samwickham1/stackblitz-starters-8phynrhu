@@ -1,4 +1,4 @@
-import { fetchGdeltQuery, fetchWikidata } from "@/lib/external";
+import { fetchGdeltQuery, fetchNewsdataQuery, fetchWikidata } from "@/lib/external";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,8 +84,11 @@ function isValidCandidate(value: string) {
   return true;
 }
 
-function extractCandidates(articles: { title?: string }[]) {
-  const map = new Map<string, { mentions: number; evidence: string[] }>();
+function extractCandidates(articles: { title?: string; source: string }[]) {
+  const map = new Map<
+    string,
+    { mentions: number; evidence: string[]; sourceCounts: Record<string, number> }
+  >();
 
   for (const article of articles) {
     const title = article.title ?? "";
@@ -96,8 +99,14 @@ function extractCandidates(articles: { title?: string }[]) {
     for (const raw of matches) {
       const candidate = normalizeCandidate(raw);
       if (!isValidCandidate(candidate)) continue;
-      const entry = map.get(candidate) ?? { mentions: 0, evidence: [] };
+      const entry = map.get(candidate) ?? {
+        mentions: 0,
+        evidence: [],
+        sourceCounts: {}
+      };
       entry.mentions += 1;
+      entry.sourceCounts[article.source] =
+        (entry.sourceCounts[article.source] ?? 0) + 1;
       if (entry.evidence.length < 3 && title) {
         entry.evidence.push(title);
       }
@@ -142,7 +151,22 @@ export async function GET(request: Request) {
   const query = searchParams.get("query") ?? DEFAULT_QUERY;
 
   const gdelt = await fetchGdeltQuery(query, 50);
-  const candidates = extractCandidates(gdelt.articles).slice(0, 12);
+  let newsdata = { articles: [] as { title?: string }[] };
+  try {
+    newsdata = await fetchNewsdataQuery(query, 50);
+  } catch {
+    newsdata = { articles: [] as { title?: string }[] };
+  }
+
+  const mergedArticles = [
+    ...gdelt.articles.map((article) => ({ title: article.title, source: "gdelt" })),
+    ...newsdata.articles.map((article) => ({
+      title: article.title,
+      source: "newsdata"
+    }))
+  ];
+
+  const candidates = extractCandidates(mergedArticles).slice(0, 12);
 
   const results = [];
 
@@ -158,6 +182,8 @@ export async function GET(request: Request) {
       name: candidate.name,
       totalScore,
       mediaMentions: candidate.mentions,
+      gdeltMentions: candidate.sourceCounts.gdelt ?? 0,
+      newsdataMentions: candidate.sourceCounts.newsdata ?? 0,
       sponsorLinks,
       evidence: candidate.evidence,
       entity: wikidata.entity

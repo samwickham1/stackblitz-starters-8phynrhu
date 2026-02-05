@@ -7,6 +7,8 @@ type Recommendation = {
   name: string;
   totalScore: number;
   mediaMentions: number;
+  gdeltMentions?: number;
+  newsdataMentions?: number;
   sponsorLinks: number;
   evidence: string[];
   entity?: {
@@ -106,6 +108,8 @@ export default function RecommendationsPage() {
 
               <div className="flex flex-wrap gap-4 text-xs text-slate">
                 <div>Media mentions: {company.mediaMentions}</div>
+                <div>GDELT: {company.gdeltMentions ?? 0}</div>
+                <div>Newsdata: {company.newsdataMentions ?? 0}</div>
                 <div>Wikidata sponsorships: {company.sponsorLinks}</div>
                 {company.entity?.url && (
                   <a

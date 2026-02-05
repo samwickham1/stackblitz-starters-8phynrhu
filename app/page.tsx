@@ -1,10 +1,51 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import CompanyCard from "@/components/CompanyCard";
-import { companies } from "@/lib/data";
-import { scoreTier, topSignals } from "@/lib/score";
+
+type Recommendation = {
+  name: string;
+  totalScore: number;
+  mediaMentions: number;
+  gdeltMentions?: number;
+  newsdataMentions?: number;
+  sponsorLinks: number;
+  evidence: string[];
+  entity?: {
+    id: string;
+    label: string;
+    description?: string;
+    url: string;
+  } | null;
+};
 
 export default function HomePage() {
-  const ranked = [...companies].sort((a, b) => b.score - a.score);
+  const [items, setItems] = useState<Recommendation[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/recommendations");
+        if (!response.ok) {
+          throw new Error("Failed to load recommendations");
+        }
+        const data = await response.json();
+        setItems(data.results ?? []);
+        setUpdatedAt(data.updatedAt ?? null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load");
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -13,34 +54,85 @@ export default function HomePage() {
           Sponsorship Signals
         </div>
         <h1 className="mt-2 text-4xl font-semibold">
-          Companies most likely to activate partnerships soon.
+          Live discovery of sponsorship-ready companies.
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-slate">
-          Click any company to view score rationale, signals, objectives, and rights‑holder fit.
+          These companies are pulled from real media signals and ranked by
+          sponsorship likelihood.
         </p>
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <Link
             href="/search"
             className="rounded-full bg-ink px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist"
           >
             Search a company
           </Link>
-          <div className="text-xs text-slate">
-            {companies.length} tracked • High tier:{" "}
-            {companies.filter((c) => scoreTier(c.score) === "High").length}
-          </div>
+          {updatedAt && (
+            <span className="text-xs text-slate">
+              Updated {new Date(updatedAt).toLocaleString()}
+            </span>
+          )}
         </div>
+        {error && (
+          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">
-        {ranked.map((company) => (
-          <div key={company.id} className="space-y-2">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate">
-              Rationale: {topSignals(company.signals).map((s) => s.type).join(" • ")}
-            </div>
-            <CompanyCard company={company} />
+        {loading && (
+          <div className="card p-4 text-sm text-slate">
+            Loading live discovery list...
           </div>
-        ))}
+        )}
+        {!loading && items.length === 0 && (
+          <div className="card p-4 text-sm text-slate">
+            No companies discovered yet. Try again later.
+          </div>
+        )}
+        {!loading &&
+          items.map((company) => (
+            <div key={company.name} className="card p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">{company.name}</div>
+                  {company.entity?.description && (
+                    <div className="mt-1 text-xs text-slate">
+                      {company.entity.description}
+                    </div>
+                  )}
+                </div>
+                <div className="text-2xl font-semibold">
+                  {company.totalScore}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 text-xs text-slate">
+                <div>Media mentions: {company.mediaMentions}</div>
+                <div>GDELT: {company.gdeltMentions ?? 0}</div>
+                <div>Newsdata: {company.newsdataMentions ?? 0}</div>
+                <div>Wikidata sponsorships: {company.sponsorLinks}</div>
+              </div>
+
+              <div className="space-y-1">
+                {company.evidence.map((title, index) => (
+                  <div key={`${company.name}-evidence-${index}`} className="text-sm">
+                    • {title}
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2">
+                <Link
+                  href={`/search?q=${encodeURIComponent(company.name)}`}
+                  className="text-xs uppercase tracking-[0.2em] text-ink underline"
+                >
+                  Score this company
+                </Link>
+              </div>
+            </div>
+          ))}
       </section>
     </div>
   );

@@ -20,6 +20,13 @@ type WikidataSponsorship = {
   instance?: string;
 };
 
+type NewsdataArticle = {
+  title: string;
+  url: string;
+  pubDate?: string;
+  sourceId?: string;
+};
+
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
@@ -76,6 +83,46 @@ export async function fetchGdeltQuery(query: string, maxRecords = 25) {
 
 export async function fetchGdelt(companyName: string) {
   return fetchGdeltQuery(companyName, 25);
+}
+
+export async function fetchNewsdataQuery(query: string, maxRecords = 25) {
+  const apiKey = process.env.NEWSDATA_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing NEWSDATA_API_KEY");
+  }
+
+  const cacheKey = `newsdata:${query.toLowerCase()}:${maxRecords}`;
+  const cached = getCached<{ articles: NewsdataArticle[] }>(cacheKey);
+  if (cached) return cached;
+
+  const url = `https://newsdata.io/api/1/latest?apikey=${apiKey}&q=${encodeURIComponent(
+    query
+  )}&language=en`;
+
+  const response = await fetch(url, {
+    headers: { "User-Agent": "signal-scout/0.1" },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Newsdata error ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawResults = data.results ?? data.data ?? [];
+  const articles = rawResults
+    .map((item: any) => ({
+      title: item.title ?? "Untitled article",
+      url: item.link ?? item.url ?? "",
+      pubDate: item.pubDate,
+      sourceId: item.source_id ?? item.source
+    }))
+    .filter((item: NewsdataArticle) => item.url)
+    .slice(0, maxRecords);
+
+  const payload = { articles };
+  setCached(cacheKey, payload);
+  return payload;
 }
 
 export async function fetchWikidata(companyName: string) {

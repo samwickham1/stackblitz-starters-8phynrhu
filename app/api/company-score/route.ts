@@ -1,5 +1,5 @@
 import { companies } from "@/lib/data";
-import { fetchGdelt, fetchWikidata } from "@/lib/external";
+import { fetchGdelt, fetchNewsdataQuery, fetchWikidata } from "@/lib/external";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +36,25 @@ function scoreFromGdelt(articles: { seenDate?: string }[]) {
     recentCount > 0
       ? `${recentCount} articles in the last ${recentWindow} days`
       : "No recent media coverage detected";
+  return { score, detail };
+}
+
+function scoreFromNewsdata(articles: { pubDate?: string }[]) {
+  const now = new Date();
+  const recentWindow = 60;
+  const recentCount = articles.filter((article) => {
+    if (!article.pubDate) return false;
+    const date = new Date(article.pubDate);
+    if (Number.isNaN(date.getTime())) return false;
+    const diffDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays <= recentWindow;
+  }).length;
+
+  const score = Math.min(20, recentCount * 3);
+  const detail =
+    recentCount > 0
+      ? `${recentCount} Newsdata articles in the last ${recentWindow} days`
+      : "No recent Newsdata coverage detected";
   return { score, detail };
 }
 
@@ -77,7 +96,15 @@ export async function GET(request: Request) {
       fetchWikidata(name)
     ]);
 
+    let newsdata = { articles: [] as { pubDate?: string }[] };
+    try {
+      newsdata = await fetchNewsdataQuery(name, 25);
+    } catch {
+      newsdata = { articles: [] as { pubDate?: string }[] };
+    }
+
     const gdeltSignal = scoreFromGdelt(gdelt.articles);
+    const newsdataSignal = scoreFromNewsdata(newsdata.articles);
     const wikiSignal = scoreFromWikidata(wikidata.sponsorOf);
 
     const externalSignals: ExternalSignal[] = [
@@ -85,6 +112,11 @@ export async function GET(request: Request) {
         type: "Media coverage",
         impact: gdeltSignal.score,
         detail: gdeltSignal.detail
+      },
+      {
+        type: "Newsdata coverage",
+        impact: newsdataSignal.score,
+        detail: newsdataSignal.detail
       },
       {
         type: "Existing sponsorships",
@@ -108,6 +140,7 @@ export async function GET(request: Request) {
       totalScore,
       externalSignals,
       gdelt: gdelt.articles,
+      newsdata: newsdata.articles,
       wikidata: wikidata
     });
   } catch (error) {
