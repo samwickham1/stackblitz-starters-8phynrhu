@@ -10,6 +10,7 @@ type Recommendation = {
   gdeltMentions?: number;
   newsdataMentions?: number;
   sponsorLinks: number;
+  signals?: { type: string; weight: number }[];
   evidence: string[];
   entity?: {
     id: string;
@@ -59,12 +60,10 @@ export default function RecommendationsPage() {
           Real companies surfaced from live signals
         </h1>
         <p className="mt-2 text-sm text-slate">
-          Ranked using GDELT news volume and Wikidata sponsorship links.
+          Ranked using GDELT + Newsdata signals, then validated with Wikidata.
         </p>
         {query && (
-          <div className="mt-2 text-xs text-slate">
-            Query: {query}
-          </div>
+          <div className="mt-2 text-xs text-slate">Query: {query}</div>
         )}
         {updatedAt && (
           <div className="mt-2 text-xs text-slate">
@@ -122,6 +121,20 @@ export default function RecommendationsPage() {
                   </a>
                 )}
               </div>
+
+              {company.signals && company.signals.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-xs text-slate">
+                  <span>Signals:</span>
+                  {company.signals.map((signal) => (
+                    <span
+                      key={signal.type}
+                      className="rounded-full bg-ink/5 px-2 py-1 text-xs font-semibold text-ink"
+                    >
+                      {signal.type.toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="space-y-1">
                 {company.evidence.map((title, index) => (

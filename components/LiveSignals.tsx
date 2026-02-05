@@ -94,7 +94,7 @@ export default function LiveSignals({ companyName }: { companyName: string }) {
             Live signals (beta)
           </div>
           <h3 className="mt-2 text-lg font-semibold">
-            External signals from Wikidata and GDELT
+            External signals from Wikidata, GDELT, and Newsdata
           </h3>
           <p className="mt-1 text-sm text-slate">
             Pulls recent news and known sponsorship links to validate scoring.

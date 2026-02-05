@@ -1,4 +1,5 @@
 import { fetchGdeltQuery, fetchNewsdataQuery, fetchWikidata } from "@/lib/external";
+import { detectSignalsFromTitles, isDisallowedCandidate } from "@/lib/signalRules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,7 +88,12 @@ function isValidCandidate(value: string) {
 function extractCandidates(articles: { title?: string; source: string }[]) {
   const map = new Map<
     string,
-    { mentions: number; evidence: string[]; sourceCounts: Record<string, number> }
+    {
+      mentions: number;
+      evidence: string[];
+      titles: string[];
+      sourceCounts: Record<string, number>;
+    }
   >();
 
   for (const article of articles) {
@@ -102,6 +108,7 @@ function extractCandidates(articles: { title?: string; source: string }[]) {
       const entry = map.get(candidate) ?? {
         mentions: 0,
         evidence: [],
+        titles: [],
         sourceCounts: {}
       };
       entry.mentions += 1;
@@ -110,6 +117,9 @@ function extractCandidates(articles: { title?: string; source: string }[]) {
       if (entry.evidence.length < 3 && title) {
         entry.evidence.push(title);
       }
+      if (entry.titles.length < 12 && title) {
+        entry.titles.push(title);
+      }
       map.set(candidate, entry);
     }
   }
@@ -117,33 +127,6 @@ function extractCandidates(articles: { title?: string; source: string }[]) {
   return Array.from(map.entries())
     .map(([name, data]) => ({ name, ...data }))
     .sort((a, b) => b.mentions - a.mentions);
-}
-
-function parseSeenDate(value?: string) {
-  if (!value) return null;
-  const raw = value.toString();
-  if (raw.length < 8) return null;
-  const year = Number(raw.slice(0, 4));
-  const month = Number(raw.slice(4, 6));
-  const day = Number(raw.slice(6, 8));
-  if (!year || !month || !day) return null;
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-function scoreFromGdelt(articles: { seenDate?: string }[]) {
-  const now = new Date();
-  const recentWindow = 60;
-  const recentCount = articles.filter((article) => {
-    const date = parseSeenDate(article.seenDate);
-    if (!date) return false;
-    const diffDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
-    return diffDays <= recentWindow;
-  }).length;
-  return Math.min(20, recentCount * 3);
-}
-
-function scoreFromWikidata(sponsorOf: unknown[]) {
-  return Math.min(15, sponsorOf.length * 3);
 }
 
 export async function GET(request: Request) {
@@ -171,12 +154,40 @@ export async function GET(request: Request) {
   const results = [];
 
   for (const candidate of candidates) {
+    if (isDisallowedCandidate(candidate.name)) {
+      continue;
+    }
+
+    const signals = detectSignalsFromTitles(candidate.titles);
+    const hasPrioritySignal = signals.some((signal) =>
+      ["funding", "geo", "cmo"].includes(signal.type)
+    );
+    if (!hasPrioritySignal) {
+      continue;
+    }
+
+    const hasMultiSource =
+      (candidate.sourceCounts.gdelt ?? 0) > 0 &&
+      (candidate.sourceCounts.newsdata ?? 0) > 0;
+    if (candidate.mentions < 2 && !hasMultiSource) {
+      continue;
+    }
+
     const wikidata = await fetchWikidata(candidate.name);
+    if (!wikidata.entity) {
+      continue;
+    }
     const sponsorLinks = wikidata.sponsorOf.length;
     const mediaScore = Math.min(25, candidate.mentions * 4);
     const sponsorScore = Math.min(20, sponsorLinks * 4);
-    const entityScore = wikidata.entity ? 5 : 0;
-    const totalScore = clampScore(40 + mediaScore + sponsorScore + entityScore);
+    const entityScore = 5;
+    const signalScore = Math.min(
+      30,
+      signals.reduce((total, signal) => total + signal.weight, 0)
+    );
+    const totalScore = clampScore(
+      35 + mediaScore + sponsorScore + signalScore + entityScore
+    );
 
     results.push({
       name: candidate.name,
@@ -185,6 +196,7 @@ export async function GET(request: Request) {
       gdeltMentions: candidate.sourceCounts.gdelt ?? 0,
       newsdataMentions: candidate.sourceCounts.newsdata ?? 0,
       sponsorLinks,
+      signals,
       evidence: candidate.evidence,
       entity: wikidata.entity
     });

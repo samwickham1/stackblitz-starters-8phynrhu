@@ -10,6 +10,7 @@ type Recommendation = {
   gdeltMentions?: number;
   newsdataMentions?: number;
   sponsorLinks: number;
+  signals?: { type: string; weight: number }[];
   evidence: string[];
   entity?: {
     id: string;
@@ -57,8 +58,8 @@ export default function HomePage() {
           Live discovery of sponsorship-ready companies.
         </h1>
         <p className="mt-3 max-w-2xl text-sm text-slate">
-          These companies are pulled from real media signals and ranked by
-          sponsorship likelihood.
+          Filtered for funding, geo expansion, or CMO hiring signals. Teams,
+          leagues, and healthcare brands are excluded.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Link
@@ -114,6 +115,20 @@ export default function HomePage() {
                 <div>Newsdata: {company.newsdataMentions ?? 0}</div>
                 <div>Wikidata sponsorships: {company.sponsorLinks}</div>
               </div>
+
+              {company.signals && company.signals.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-xs text-slate">
+                  <span>Signals:</span>
+                  {company.signals.map((signal) => (
+                    <span
+                      key={signal.type}
+                      className="rounded-full bg-ink/5 px-2 py-1 text-xs font-semibold text-ink"
+                    >
+                      {signal.type.toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="space-y-1">
                 {company.evidence.map((title, index) => (

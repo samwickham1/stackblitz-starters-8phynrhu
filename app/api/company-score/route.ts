@@ -1,5 +1,6 @@
 import { companies } from "@/lib/data";
 import { fetchGdelt, fetchNewsdataQuery, fetchWikidata } from "@/lib/external";
+import { detectSignalsFromTitles } from "@/lib/signalRules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +108,16 @@ export async function GET(request: Request) {
     const newsdataSignal = scoreFromNewsdata(newsdata.articles);
     const wikiSignal = scoreFromWikidata(wikidata.sponsorOf);
 
+    const titles = [
+      ...gdelt.articles.map((article) => article.title).filter(Boolean),
+      ...newsdata.articles.map((article) => article.title).filter(Boolean)
+    ] as string[];
+    const signalMatches = detectSignalsFromTitles(titles);
+    const signalScore = Math.min(
+      30,
+      signalMatches.reduce((total, signal) => total + signal.weight, 0)
+    );
+
     const externalSignals: ExternalSignal[] = [
       {
         type: "Media coverage",
@@ -125,6 +136,14 @@ export async function GET(request: Request) {
       }
     ];
 
+    signalMatches.forEach((signal) => {
+      externalSignals.push({
+        type: `Signal: ${signal.type.toUpperCase()}`,
+        impact: signal.weight,
+        detail: signal.matches[0] ?? "Matched in recent coverage"
+      });
+    });
+
     const baseScore = company?.score ?? 50;
     const externalScore = externalSignals.reduce(
       (total, signal) => total + signal.impact,
@@ -139,6 +158,8 @@ export async function GET(request: Request) {
       externalScore,
       totalScore,
       externalSignals,
+      signalMatches,
+      signalScore,
       gdelt: gdelt.articles,
       newsdata: newsdata.articles,
       wikidata: wikidata
